@@ -1,0 +1,16 @@
+# Zip files - usiwahi push tena
+*.zip
+*.rar
+*.7z
+
+# Java build
+backend/target/
+*.class
+
+# Node modules
+frontend/clinic-ui/node_modules/
+frontend/clinic-ui/dist/
+frontend/clinic-ui/build/
+
+# Env files
+.env
