@@ -62,6 +62,12 @@ public class ModuleDataInitializer {
                 ),
 
                 new Module(
+                    "MATERNITY",
+                    "Maternity",
+                    "/maternity"
+                ),
+
+                new Module(
                     "USERS",
                     "Users",
                     "/users"
@@ -72,6 +78,10 @@ public class ModuleDataInitializer {
 
                 if (!moduleRepository.existsByName(module.getName())) {
                     moduleRepository.save(module);
+
+                    System.out.println(
+                        "Created module: " + module.getName()
+                    );
                 }
             }
         };

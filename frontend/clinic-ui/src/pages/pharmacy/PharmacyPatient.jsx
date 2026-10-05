@@ -15,11 +15,13 @@ import {
   ClipboardList,
   Boxes,
 } from "lucide-react";
+
 import {
   Link,
   useParams,
   useSearchParams,
 } from "react-router-dom";
+
 import api from "../../services/api";
 
 // =========================================================
@@ -102,6 +104,10 @@ function getAge(dateOfBirth) {
   return age;
 }
 
+// =========================================================
+// PRESCRIPTION HELPERS
+// =========================================================
+
 function getPrescriptionItems(prescription) {
   if (!prescription) return [];
 
@@ -109,7 +115,11 @@ function getPrescriptionItems(prescription) {
     return prescription.items;
   }
 
-  if (Array.isArray(prescription.prescriptionItems)) {
+  if (
+    Array.isArray(
+      prescription.prescriptionItems
+    )
+  ) {
     return prescription.prescriptionItems;
   }
 
@@ -120,6 +130,7 @@ function getMedicineName(item) {
   return (
     item?.medicineName ||
     item?.medicine?.name ||
+    item?.medicine?.medicineName ||
     "-"
   );
 }
@@ -132,11 +143,34 @@ function getMedicineStrength(item) {
   );
 }
 
+function getMedicineId(item) {
+  return (
+    item?.medicineId ??
+    item?.medicine?.id ??
+    item?.medicine?.medicineId ??
+    null
+  );
+}
+
+// =========================================================
+// BATCH HELPERS
+// =========================================================
+
 function getBatchMedicineName(batch) {
   return (
     batch?.medicine?.name ||
+    batch?.medicine?.medicineName ||
     batch?.medicineName ||
     ""
+  );
+}
+
+function getBatchMedicineId(batch) {
+  return (
+    batch?.medicineId ??
+    batch?.medicine?.id ??
+    batch?.medicine?.medicineId ??
+    null
   );
 }
 
@@ -148,24 +182,24 @@ function getBatchStrength(batch) {
   );
 }
 
+function getBatchQuantity(batch) {
+  return Number(
+    batch?.quantity ??
+      batch?.availableQuantity ??
+      batch?.stockQuantity ??
+      batch?.remainingQuantity ??
+      0
+  );
+}
+
 // =========================================================
 // MEDICINE NAME NORMALIZATION
-// =========================================================
-//
-// Hii inasaidia ku-match majina kama:
-//
-// "tab paracetamol"
-// "tablet paracetamol"
-// "Paracetamol"
-// "PARACETAMOL"
-//
-// kuwa dawa moja.
 // =========================================================
 
 function normalizeMedicineName(value) {
   if (!value) return "";
 
-  return value
+  return String(value)
     .toLowerCase()
     .trim()
     .replace(
@@ -175,70 +209,147 @@ function normalizeMedicineName(value) {
     .replace(/\s+/g, " ");
 }
 
-function medicineNamesMatch(
-  firstName,
-  secondName
-) {
-  return (
-    normalizeMedicineName(firstName) ===
-    normalizeMedicineName(secondName)
-  );
-}
-
 // =========================================================
-// MEDICINE STRENGTH NORMALIZATION
-// =========================================================
-//
-// Hii inasaidia ku-match strength kama:
-//
-// "1 ml"
-// "1 mls"
-// "1ml"
-// "1 ML"
-// "500 mg"
-// "500mg"
-// "500 MG"
-//
-// bila kuathiri medicine name matching.
+// STRENGTH NORMALIZATION
 // =========================================================
 
-function normalizeMedicineStrength(value) {
+function normalizeStrength(value) {
   if (!value) return "";
 
   return String(value)
     .toLowerCase()
     .trim()
     .replace(/\s+/g, "")
-    .replace(/milliliters?/g, "ml")
-    .replace(/millilitres?/g, "ml")
-    .replace(/mls/g, "ml")
     .replace(/milligrams?/g, "mg")
-    .replace(/mgs/g, "mg")
+    .replace(/milligrammes?/g, "mg")
     .replace(/grams?/g, "g")
-    .replace(/gs/g, "g");
+    .replace(/grammes?/g, "g")
+    .replace(/micrograms?/g, "mcg")
+    .replace(/microgrammes?/g, "mcg");
 }
+
+// =========================================================
+// MEDICINE MATCHING
+// =========================================================
+
+function medicineNamesMatch(
+  firstName,
+  secondName
+) {
+  const first =
+    normalizeMedicineName(firstName);
+
+  const second =
+    normalizeMedicineName(secondName);
+
+  if (!first || !second) {
+    return false;
+  }
+
+  return first === second;
+}
+
+// =========================================================
+// STRENGTH MATCHING
+// =========================================================
 
 function medicineStrengthsMatch(
   firstStrength,
   secondStrength
 ) {
   const first =
-    normalizeMedicineStrength(
-      firstStrength
-    );
+    normalizeStrength(firstStrength);
 
   const second =
-    normalizeMedicineStrength(
-      secondStrength
-    );
+    normalizeStrength(secondStrength);
 
-  // Kama moja haina strength,
-  // tusikatae batch kwa sababu hiyo.
   if (!first || !second) {
     return true;
   }
 
+  if (
+    first === "-" ||
+    second === "-"
+  ) {
+    return true;
+  }
+
   return first === second;
+}
+
+// =========================================================
+// MEDICINE/BATCH MATCH
+// =========================================================
+//
+// Priority:
+//
+// 1. Medicine ID
+// 2. Medicine name + strength
+// 3. Medicine name only
+//
+// Hii inasaidia hata kama backend inarudisha
+// medicine object tofauti kidogo.
+// =========================================================
+
+function medicineBatchMatches(item, batch) {
+  const prescriptionMedicineId = getMedicineId(item);
+  const batchMedicineId = getBatchMedicineId(batch);
+
+  // =====================================================
+  // 1. MATCH BY MEDICINE ID
+  // =====================================================
+
+  if (
+    prescriptionMedicineId !== null &&
+    prescriptionMedicineId !== undefined &&
+    batchMedicineId !== null &&
+    batchMedicineId !== undefined
+  ) {
+    return (
+      Number(prescriptionMedicineId) ===
+      Number(batchMedicineId)
+    );
+  }
+
+  // =====================================================
+  // 2. FALLBACK TO MEDICINE NAME
+  // =====================================================
+
+  const itemName = getMedicineName(item);
+  const batchName = getBatchMedicineName(batch);
+
+  return medicineNamesMatch(
+    batchName,
+    itemName
+  );
+}
+// =========================================================
+// EXPIRY CHECK
+// =========================================================
+
+function isBatchExpired(batch) {
+  if (!batch?.expiryDate) {
+    return false;
+  }
+
+  const expiry = new Date(
+    batch.expiryDate
+  );
+
+  if (Number.isNaN(expiry.getTime())) {
+    return false;
+  }
+
+  expiry.setHours(
+    23,
+    59,
+    59,
+    999
+  );
+
+  const now = new Date();
+
+  return expiry < now;
 }
 
 // =========================================================
@@ -247,20 +358,35 @@ function medicineStrengthsMatch(
 
 export default function PharmacyPatient() {
   const { id } = useParams();
-  const [searchParams] = useSearchParams();
 
-  const visitId = searchParams.get("visitId");
+  const [searchParams] =
+    useSearchParams();
 
-  const numericPatientId = Number(id);
-  const numericVisitId = Number(visitId);
+  const visitId =
+    searchParams.get("visitId");
 
-  const [patient, setPatient] = useState(null);
-  const [prescriptions, setPrescriptions] = useState([]);
-  const [batches, setBatches] = useState([]);
-  const [queue, setQueue] = useState(null);
+  const numericPatientId =
+    Number(id);
 
-  const [dispensingItems, setDispensingItems] =
-    useState({});
+  const numericVisitId =
+    Number(visitId);
+
+  const [patient, setPatient] =
+    useState(null);
+
+  const [prescriptions, setPrescriptions] =
+    useState([]);
+
+  const [batches, setBatches] =
+    useState([]);
+
+  const [queue, setQueue] =
+    useState(null);
+
+  const [
+    dispensingItems,
+    setDispensingItems,
+  ] = useState({});
 
   const [loading, setLoading] =
     useState(true);
@@ -268,8 +394,11 @@ export default function PharmacyPatient() {
   const [dispensing, setDispensing] =
     useState(false);
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] =
+    useState("");
+
+  const [success, setSuccess] =
+    useState("");
 
   // =========================================================
   // LOAD DATA
@@ -281,21 +410,29 @@ export default function PharmacyPatient() {
 
   async function loadPatient() {
     if (
-      !Number.isInteger(numericPatientId) ||
+      !Number.isInteger(
+        numericPatientId
+      ) ||
       numericPatientId <= 0
     ) {
-      setError("Patient ID si sahihi.");
+      setError(
+        "Patient ID si sahihi."
+      );
+
       setLoading(false);
       return;
     }
 
     if (
-      !Number.isInteger(numericVisitId) ||
+      !Number.isInteger(
+        numericVisitId
+      ) ||
       numericVisitId <= 0
     ) {
       setError(
         "Visit ID haipo au si sahihi."
       );
+
       setLoading(false);
       return;
     }
@@ -308,6 +445,10 @@ export default function PharmacyPatient() {
         new Date()
           .toISOString()
           .split("T")[0];
+
+      // =====================================================
+      // LOAD MAIN DATA
+      // =====================================================
 
       const [
         patientResponse,
@@ -355,12 +496,31 @@ export default function PharmacyPatient() {
         )
           ? queueResponse.data.find(
               (item) =>
-                Number(item.patientId) ===
+                Number(
+                  item.patientId
+                ) ===
                   numericPatientId &&
-                Number(item.visitId) ===
+                Number(
+                  item.visitId
+                ) ===
                   numericVisitId
             )
           : null;
+
+      console.log(
+        "PHARMACY PATIENT:",
+        loadedPatient
+      );
+
+      console.log(
+        "PHARMACY PRESCRIPTIONS:",
+        loadedPrescriptions
+      );
+
+      console.log(
+        "PHARMACY BATCHES:",
+        loadedBatches
+      );
 
       // =====================================================
       // LOAD PRESCRIPTION ITEMS
@@ -389,6 +549,7 @@ export default function PharmacyPatient() {
 
                 return {
                   ...prescription,
+
                   items:
                     Array.isArray(
                       itemResponse.data
@@ -411,61 +572,137 @@ export default function PharmacyPatient() {
           )
         );
 
-      setPatient(loadedPatient);
+      // =====================================================
+      // SAVE STATE
+      // =====================================================
+
+      setPatient(
+        loadedPatient
+      );
+
       setPrescriptions(
         loadedPrescriptions
       );
-      setBatches(loadedBatches);
-      setQueue(loadedQueue);
+
+      setBatches(
+        loadedBatches
+      );
+
+      setQueue(
+        loadedQueue
+      );
 
       // =====================================================
       // INITIAL DISPENSING ITEMS
-      // =====================================================
-      //
-      // IMPORTANT:
-      // Tunatumia getAvailableBatchesForItem()
-      // ili initialization itumie logic ileile
-      // inayotumiwa na Batch dropdown.
-      //
-      // Hii inazuia hali ya:
-      //
-      // Available Stock = 200
-      // lakini dropdown = hakuna batch.
       // =====================================================
 
       const initialItems = {};
 
       loadedPrescriptions.forEach(
         (prescription) => {
-          getPrescriptionItems(
-            prescription
-          ).forEach((item) => {
-            const matchingBatches =
-              getAvailableBatchesForItem(
-                item,
-                loadedBatches
+          const items =
+            getPrescriptionItems(
+              prescription
+            );
+
+          items.forEach(
+            (item) => {
+              const matchingBatches =
+                loadedBatches.filter(
+                  (batch) => {
+                    const matches =
+                      medicineBatchMatches(
+                        item,
+                        batch
+                      );
+
+                    const quantity =
+                      getBatchQuantity(
+                        batch
+                      );
+
+                    const expired =
+                      isBatchExpired(
+                        batch
+                      );
+
+                    return (
+                      matches &&
+                      quantity > 0 &&
+                      !expired
+                    );
+                  }
+                );
+
+              // Prefer batch with earliest expiry.
+              // This follows FEFO principle.
+              const sortedBatches =
+                [...matchingBatches].sort(
+                  (a, b) => {
+                    const dateA =
+                      new Date(
+                        a.expiryDate ||
+                          "9999-12-31"
+                      ).getTime();
+
+                    const dateB =
+                      new Date(
+                        b.expiryDate ||
+                          "9999-12-31"
+                      ).getTime();
+
+                    return (
+                      dateA - dateB
+                    );
+                  }
+                );
+
+              const firstBatch =
+                sortedBatches[0];
+
+              console.log(
+                "MATCH ITEM:",
+                {
+                  item,
+                  medicineId:
+                    getMedicineId(
+                      item
+                    ),
+                  medicineName:
+                    getMedicineName(
+                      item
+                    ),
+                  strength:
+                    getMedicineStrength(
+                      item
+                    ),
+                  matchingBatches:
+                    sortedBatches,
+                }
               );
 
-            const firstBatch =
-              matchingBatches[0];
+              initialItems[
+                item.id
+              ] = {
+                batchId:
+                  firstBatch?.id ||
+                  "",
 
-            initialItems[item.id] = {
-              batchId:
-                firstBatch?.id || "",
+                dispensedQuantity:
+                  item.quantity || 0,
 
-              dispensedQuantity:
-                item.quantity || 0,
+                unitPrice:
+                  item.unitPrice ??
+                  firstBatch?.medicine
+                    ?.unitPrice ??
+                  0,
 
-              unitPrice:
-                item.unitPrice ??
-                firstBatch?.medicine
-                  ?.unitPrice ??
-                0,
-
-              instructions:
-                item.instructions || "",
-            };
-          });
+                instructions:
+                  item.instructions ||
+                  "",
+              };
+            }
+          );
         }
       );
 
@@ -479,7 +716,10 @@ export default function PharmacyPatient() {
       );
 
       setError(
-        err.response?.data?.message ||
+        err.response?.data
+          ?.message ||
+          err.response?.data
+            ?.error ||
           "Imeshindikana kupata taarifa za mgonjwa."
       );
     } finally {
@@ -499,8 +739,10 @@ export default function PharmacyPatient() {
             prescription
           ).map((item) => ({
             ...item,
+
             prescriptionId:
               prescription.id,
+
             paymentType:
               prescription.paymentType ||
               "CASH",
@@ -516,17 +758,22 @@ export default function PharmacyPatient() {
       return allPrescriptionItems.reduce(
         (total, item) => {
           const formItem =
-            dispensingItems[item.id];
+            dispensingItems[
+              item.id
+            ];
 
           const quantity =
             Number(
-              formItem?.dispensedQuantity ||
+              formItem
+                ?.dispensedQuantity ||
                 0
             );
 
           const price =
             Number(
-              formItem?.unitPrice || 0
+              formItem
+                ?.unitPrice ||
+                0
             );
 
           return (
@@ -542,79 +789,54 @@ export default function PharmacyPatient() {
     ]);
 
   // =========================================================
-  // AVAILABLE BATCHES
-  // =========================================================
-  //
-  // Function hii inatumika sehemu mbili:
-  //
-  // 1. Initial dispensing item
-  // 2. Batch dropdown
-  //
-  // Kwa hiyo logic ya batch selection inabaki
-  // consistent sehemu zote.
+  // GET AVAILABLE BATCHES FOR ITEM
   // =========================================================
 
   function getAvailableBatchesForItem(
-    item,
-    sourceBatches = batches
+    item
   ) {
-    const medicineName =
-      getMedicineName(item);
-
-    const medicineStrength =
-      getMedicineStrength(item);
-
-    return sourceBatches.filter(
-      (batch) => {
-        const batchMedicine =
-          getBatchMedicineName(batch);
-
-        const batchStrength =
-          getBatchStrength(batch);
-
-        // ===================================================
-        // MEDICINE NAME MATCHING
-        // ===================================================
-
-        const nameMatches =
-          medicineNamesMatch(
-            batchMedicine,
-            medicineName
+    return batches
+      .filter((batch) => {
+        const medicineMatches =
+          medicineBatchMatches(
+            item,
+            batch
           );
 
-        if (!nameMatches) {
+        if (!medicineMatches) {
           return false;
         }
 
-        // ===================================================
-        // STRENGTH MATCHING
-        // ===================================================
-        //
-        // Mfano:
-        //
-        // Prescription: 1 mls
-        // Batch:        1 ml
-        //
-        // zitaonekana kuwa sawa.
-        // ===================================================
+        const quantity =
+          getBatchQuantity(batch);
 
-        if (
-          medicineStrength &&
-          batchStrength &&
-          medicineStrength !== "-" &&
-          batchStrength !== "-"
-        ) {
-          return medicineStrengthsMatch(
-            batchStrength,
-            medicineStrength
-          );
+        if (quantity <= 0) {
+          return false;
         }
 
-        // Kama strength haipo upande mmoja,
-        // name match inatosha.
+        if (
+          isBatchExpired(batch)
+        ) {
+          return false;
+        }
+
         return true;
-      }
-    );
+      })
+      .sort((a, b) => {
+        const dateA =
+          new Date(
+            a.expiryDate ||
+              "9999-12-31"
+          ).getTime();
+
+        const dateB =
+          new Date(
+            b.expiryDate ||
+              "9999-12-31"
+          ).getTime();
+
+        return dateA - dateB;
+      });
   }
 
   // =========================================================
@@ -632,6 +854,7 @@ export default function PharmacyPatient() {
 
         [itemId]: {
           ...previous[itemId],
+
           [field]: value,
         },
       })
@@ -665,8 +888,10 @@ export default function PharmacyPatient() {
           ?.unitPrice;
 
       if (
-        medicinePrice !== null &&
-        medicinePrice !== undefined
+        medicinePrice !==
+          null &&
+        medicinePrice !==
+          undefined
       ) {
         updateDispensingItem(
           item.id,
@@ -698,13 +923,14 @@ export default function PharmacyPatient() {
       setError(
         "Prescription hii haina dawa."
       );
+
       return;
     }
 
     const requestItems = [];
 
     // =====================================================
-    // VALIDATE EACH PRESCRIPTION ITEM
+    // VALIDATE EACH ITEM
     // =====================================================
 
     for (
@@ -719,11 +945,14 @@ export default function PharmacyPatient() {
             item
           )} hazijakamilika.`
         );
+
         return;
       }
 
       const batchId =
-        Number(formItem.batchId);
+        Number(
+          formItem.batchId
+        );
 
       const quantity =
         Number(
@@ -731,14 +960,18 @@ export default function PharmacyPatient() {
         );
 
       const prescribedQuantity =
-        Number(item.quantity || 0);
+        Number(
+          item.quantity || 0
+        );
 
-      // ===================================================
-      // BATCH VALIDATION
-      // ===================================================
+      // -----------------------------------------------------
+      // BATCH ID
+      // -----------------------------------------------------
 
       if (
-        !Number.isInteger(batchId) ||
+        !Number.isInteger(
+          batchId
+        ) ||
         batchId <= 0
       ) {
         setError(
@@ -746,15 +979,18 @@ export default function PharmacyPatient() {
             item
           )}.`
         );
+
         return;
       }
 
-      // ===================================================
-      // QUANTITY VALIDATION
-      // ===================================================
+      // -----------------------------------------------------
+      // QUANTITY
+      // -----------------------------------------------------
 
       if (
-        !Number.isInteger(quantity) ||
+        !Number.isInteger(
+          quantity
+        ) ||
         quantity <= 0
       ) {
         setError(
@@ -762,8 +998,13 @@ export default function PharmacyPatient() {
             item
           )}.`
         );
+
         return;
       }
+
+      // -----------------------------------------------------
+      // PRESCRIBED LIMIT
+      // -----------------------------------------------------
 
       if (
         quantity >
@@ -774,12 +1015,13 @@ export default function PharmacyPatient() {
             item
           )}. Doctor ameandika ${prescribedQuantity}.`
         );
+
         return;
       }
 
-      // ===================================================
+      // -----------------------------------------------------
       // FIND SELECTED BATCH
-      // ===================================================
+      // -----------------------------------------------------
 
       const selectedBatch =
         batches.find(
@@ -792,19 +1034,69 @@ export default function PharmacyPatient() {
         setError(
           `Batch ya ${getMedicineName(
             item
-          )} haipatikani.`
+          )} haipatikani kwenye taarifa zilizopakuliwa. Tafadhali refresh ukurasa.`
         );
+
         return;
       }
 
-      // ===================================================
-      // STOCK VALIDATION
-      // ===================================================
+      // -----------------------------------------------------
+      // CHECK MEDICINE MATCH
+      // -----------------------------------------------------
+
+      if (
+        !medicineBatchMatches(
+          item,
+          selectedBatch
+        )
+      ) {
+        setError(
+          `Batch ${selectedBatch.batchNumber || batchId} haiendani na dawa ${getMedicineName(
+            item
+          )}.`
+        );
+
+        return;
+      }
+
+      // -----------------------------------------------------
+      // EXPIRY PROTECTION
+      // -----------------------------------------------------
+
+      if (
+        isBatchExpired(
+          selectedBatch
+        )
+      ) {
+        setError(
+          `Batch ${selectedBatch.batchNumber || batchId} ya ${getMedicineName(
+            item
+          )} ime-expire. Huwezi kutoa dawa hii.`
+        );
+
+        return;
+      }
+
+      // -----------------------------------------------------
+      // STOCK
+      // -----------------------------------------------------
 
       const availableStock =
-        Number(
-          selectedBatch.quantity || 0
+        getBatchQuantity(
+          selectedBatch
         );
+
+      if (
+        availableStock <= 0
+      ) {
+        setError(
+          `Stock ya ${getMedicineName(
+            item
+          )} kwenye batch hii imeisha.`
+        );
+
+        return;
+      }
 
       if (
         quantity >
@@ -815,12 +1107,13 @@ export default function PharmacyPatient() {
             item
           )} ni ${availableStock} tu.`
         );
+
         return;
       }
 
-      // ===================================================
+      // -----------------------------------------------------
       // REQUEST ITEM
-      // ===================================================
+      // -----------------------------------------------------
 
       requestItems.push({
         batchId,
@@ -830,7 +1123,8 @@ export default function PharmacyPatient() {
 
         unitPrice:
           Number(
-            formItem.unitPrice || 0
+            formItem.unitPrice ||
+              0
           ),
 
         instructions:
@@ -841,7 +1135,7 @@ export default function PharmacyPatient() {
     }
 
     // =========================================================
-    // SEND DISPENSING REQUEST
+    // SEND TO BACKEND
     // =========================================================
 
     try {
@@ -850,6 +1144,24 @@ export default function PharmacyPatient() {
       const paymentType =
         prescription.paymentType ||
         "CASH";
+
+      console.log(
+        "DISPENSING REQUEST:",
+        {
+          patientId:
+            numericPatientId,
+
+          visitId:
+            numericVisitId,
+
+          prescriptionId:
+            prescription.id,
+
+          paymentType,
+
+          requestItems,
+        }
+      );
 
       await api.post(
         `/dispensings`,
@@ -878,7 +1190,10 @@ export default function PharmacyPatient() {
         "Dawa zimetolewa kwa mafanikio."
       );
 
-      // Reload data
+      // =====================================================
+      // RELOAD
+      // =====================================================
+
       await loadPatient();
     } catch (err) {
       console.error(
@@ -887,12 +1202,17 @@ export default function PharmacyPatient() {
       );
 
       const backendMessage =
-        err.response?.data?.message ||
-        err.response?.data?.error;
+        err.response?.data
+          ?.message ||
+        err.response?.data
+          ?.error ||
+        err.response?.data;
 
       setError(
-        backendMessage ||
-          "Imeshindikana kutoa dawa. Tafadhali jaribu tena."
+        typeof backendMessage ===
+          "string"
+          ? backendMessage
+          : "Imeshindikana kutoa dawa. Tafadhali jaribu tena."
       );
     } finally {
       setDispensing(false);
@@ -941,6 +1261,7 @@ export default function PharmacyPatient() {
             className="inline-flex items-center gap-2 text-slate-600 hover:text-blue-600 font-medium mb-6"
           >
             <ArrowLeft size={18} />
+
             Rudi kwenye Prescriptions
           </Link>
 
@@ -974,7 +1295,7 @@ export default function PharmacyPatient() {
     <div className="min-h-screen bg-slate-100">
 
       {/* =====================================================
-          TOP DECORATIVE AREA
+          HEADER
       ===================================================== */}
 
       <div className="relative overflow-hidden bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-700">
@@ -990,6 +1311,7 @@ export default function PharmacyPatient() {
             className="inline-flex items-center gap-2 text-blue-100 hover:text-white transition mb-6"
           >
             <ArrowLeft size={18} />
+
             Rudi kwenye Prescriptions
           </Link>
 
@@ -998,6 +1320,7 @@ export default function PharmacyPatient() {
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs font-semibold mb-4">
                 <Pill size={14} />
+
                 PHARMACY
               </div>
 
@@ -1090,7 +1413,7 @@ export default function PharmacyPatient() {
         )}
 
         {/* =====================================================
-            PATIENT PROFILE CARD
+            PATIENT PROFILE
         ===================================================== */}
 
         <section className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden mb-6">
@@ -1115,12 +1438,15 @@ export default function PharmacyPatient() {
                 </div>
 
                 <div>
+
                   <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
                     Patient
                   </p>
 
                   <h2 className="text-2xl font-bold text-slate-900 mt-1">
-                    {getPatientName(patient)}
+                    {getPatientName(
+                      patient
+                    )}
                   </h2>
 
                   <p className="text-sm text-slate-500 mt-1">
@@ -1130,6 +1456,7 @@ export default function PharmacyPatient() {
                         patient.id}
                     </span>
                   </p>
+
                 </div>
 
               </div>
@@ -1137,6 +1464,7 @@ export default function PharmacyPatient() {
               <div className="flex flex-wrap gap-3">
 
                 <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-blue-50 border border-blue-100">
+
                   <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center">
                     <Calendar
                       size={18}
@@ -1155,9 +1483,11 @@ export default function PharmacyPatient() {
                       )}
                     </p>
                   </div>
+
                 </div>
 
                 <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-emerald-50 border border-emerald-100">
+
                   <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center">
                     <Phone
                       size={18}
@@ -1171,9 +1501,11 @@ export default function PharmacyPatient() {
                     </p>
 
                     <p className="text-sm font-semibold text-slate-800">
-                      {patient.phone || "-"}
+                      {patient.phone ||
+                        "-"}
                     </p>
                   </div>
+
                 </div>
 
               </div>
@@ -1188,7 +1520,8 @@ export default function PharmacyPatient() {
                 </p>
 
                 <p className="font-semibold text-slate-800 mt-1">
-                  {patient.gender || "-"}
+                  {patient.gender ||
+                    "-"}
                 </p>
               </div>
 
@@ -1221,7 +1554,8 @@ export default function PharmacyPatient() {
                 </p>
 
                 <p className="font-semibold text-slate-800 mt-1">
-                  {queue?.status || "-"}
+                  {queue?.status ||
+                    "-"}
                 </p>
               </div>
 
@@ -1248,6 +1582,7 @@ export default function PharmacyPatient() {
               </div>
 
               <div>
+
                 <p className="text-xs text-slate-400">
                   Visit Number
                 </p>
@@ -1258,9 +1593,11 @@ export default function PharmacyPatient() {
                       numericVisitId
                     ).padStart(6, "0")}`}
                 </p>
+
               </div>
 
             </div>
+
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
@@ -1275,6 +1612,7 @@ export default function PharmacyPatient() {
               </div>
 
               <div>
+
                 <p className="text-xs text-slate-400">
                   Visit Date
                 </p>
@@ -1284,9 +1622,11 @@ export default function PharmacyPatient() {
                     queue?.queueDate
                   )}
                 </p>
+
               </div>
 
             </div>
+
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
@@ -1301,6 +1641,7 @@ export default function PharmacyPatient() {
               </div>
 
               <div>
+
                 <p className="text-xs text-slate-400">
                   Prescriptions
                 </p>
@@ -1308,9 +1649,11 @@ export default function PharmacyPatient() {
                 <p className="font-bold text-slate-900 mt-1">
                   {prescriptions.length}
                 </p>
+
               </div>
 
             </div>
+
           </div>
 
         </section>
@@ -1323,10 +1666,12 @@ export default function PharmacyPatient() {
           <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-12 text-center">
 
             <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center mx-auto">
+
               <Pill
                 size={38}
                 className="text-slate-300"
               />
+
             </div>
 
             <h2 className="text-xl font-bold text-slate-900 mt-5">
@@ -1362,19 +1707,22 @@ export default function PharmacyPatient() {
 
                       const quantity =
                         Number(
-                          formItem?.dispensedQuantity ||
+                          formItem
+                            ?.dispensedQuantity ||
                             0
                         );
 
                       const price =
                         Number(
-                          formItem?.unitPrice ||
+                          formItem
+                            ?.unitPrice ||
                             0
                         );
 
                       return (
                         total +
-                        quantity * price
+                        quantity *
+                          price
                       );
                     },
                     0
@@ -1382,11 +1730,15 @@ export default function PharmacyPatient() {
 
                 return (
                   <section
-                    key={prescription.id}
+                    key={
+                      prescription.id
+                    }
                     className="bg-white rounded-3xl border border-slate-200 shadow-lg overflow-hidden"
                   >
 
-                    {/* PRESCRIPTION HEADER */}
+                    {/* =================================================
+                        PRESCRIPTION HEADER
+                    ================================================= */}
 
                     <div className="p-5 md:p-6 bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200">
 
@@ -1395,19 +1747,25 @@ export default function PharmacyPatient() {
                         <div className="flex items-center gap-4">
 
                           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+
                             <Pill
                               size={27}
                               className="text-white"
                             />
+
                           </div>
 
                           <div>
+
                             <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
                               Prescription
                             </p>
 
                             <h2 className="text-xl font-bold text-slate-900 mt-1">
-                              #{prescription.id}
+                              #
+                              {
+                                prescription.id
+                              }
                             </h2>
 
                             <p className="text-sm text-slate-500 mt-1">
@@ -1416,6 +1774,7 @@ export default function PharmacyPatient() {
                                 prescription.createdAt
                               )}
                             </p>
+
                           </div>
 
                         </div>
@@ -1429,6 +1788,7 @@ export default function PharmacyPatient() {
                                 : "bg-amber-100 text-amber-700"
                             }`}
                           >
+
                             {isCompleted ? (
                               <CheckCircle2
                                 size={14}
@@ -1441,22 +1801,29 @@ export default function PharmacyPatient() {
 
                             {prescription.status ||
                               "PENDING"}
+
                           </span>
 
                           <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold">
+
                             <CreditCard
                               size={14}
                             />
 
                             {prescription.paymentType ||
                               "CASH"}
+
                           </span>
 
                         </div>
+
                       </div>
+
                     </div>
 
-                    {/* MEDICINES */}
+                    {/* =================================================
+                        MEDICINES
+                    ================================================= */}
 
                     <div className="p-5 md:p-6">
 
@@ -1465,13 +1832,16 @@ export default function PharmacyPatient() {
                         <div className="flex items-center gap-3">
 
                           <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center">
+
                             <Boxes
                               size={20}
                               className="text-violet-600"
                             />
+
                           </div>
 
                           <div>
+
                             <h3 className="font-bold text-slate-900">
                               Medicine Items
                             </h3>
@@ -1479,13 +1849,15 @@ export default function PharmacyPatient() {
                             <p className="text-xs text-slate-500 mt-0.5">
                               Dawa zilizoandikwa na Doctor
                             </p>
+
                           </div>
 
                         </div>
 
                         <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold">
                           {items.length} item
-                          {items.length !== 1
+                          {items.length !==
+                          1
                             ? "s"
                             : ""}
                         </span>
@@ -1519,13 +1891,15 @@ export default function PharmacyPatient() {
 
                             const quantity =
                               Number(
-                                formItem.dispensedQuantity ||
+                                formItem
+                                  .dispensedQuantity ||
                                   0
                               );
 
                             const unitPrice =
                               Number(
-                                formItem.unitPrice ||
+                                formItem
+                                  .unitPrice ||
                                   0
                               );
 
@@ -1546,13 +1920,16 @@ export default function PharmacyPatient() {
                                   <div className="flex items-center gap-3">
 
                                     <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+
                                       <Pill
                                         size={21}
                                         className="text-blue-600"
                                       />
+
                                     </div>
 
                                     <div>
+
                                       <h4 className="font-bold text-slate-900">
                                         {getMedicineName(
                                           item
@@ -1564,6 +1941,7 @@ export default function PharmacyPatient() {
                                           item
                                         )}
                                       </p>
+
                                     </div>
 
                                   </div>
@@ -1572,7 +1950,9 @@ export default function PharmacyPatient() {
 
                                     <span className="px-3 py-2 rounded-xl bg-blue-100 text-blue-700 text-xs font-bold">
                                       Prescribed:{" "}
-                                      {item.quantity}
+                                      {
+                                        item.quantity
+                                      }
                                     </span>
 
                                   </div>
@@ -1586,6 +1966,7 @@ export default function PharmacyPatient() {
                                   {/* BATCH */}
 
                                   <div>
+
                                     <label className="block text-xs font-semibold text-slate-500 mb-2">
                                       Batch
                                     </label>
@@ -1610,12 +1991,15 @@ export default function PharmacyPatient() {
                                       }
                                       className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     >
+
                                       <option value="">
                                         Chagua Batch
                                       </option>
 
                                       {itemBatches.map(
-                                        (batch) => (
+                                        (
+                                          batch
+                                        ) => (
                                           <option
                                             key={
                                               batch.id
@@ -1625,10 +2009,17 @@ export default function PharmacyPatient() {
                                             }
                                           >
                                             {batch.batchNumber ||
-                                              `Batch ${batch.id}`}
+                                              `Batch ${batch.id}`}{" "}
+                                            — Stock:{" "}
+                                            {
+                                              getBatchQuantity(
+                                                batch
+                                              )
+                                            }
                                           </option>
                                         )
                                       )}
+
                                     </select>
 
                                     {itemBatches.length ===
@@ -1637,11 +2028,13 @@ export default function PharmacyPatient() {
                                         Hakuna stock inayopatikana.
                                       </p>
                                     )}
+
                                   </div>
 
                                   {/* STOCK */}
 
                                   <div>
+
                                     <label className="block text-xs font-semibold text-slate-500 mb-2">
                                       Available Stock
                                     </label>
@@ -1649,16 +2042,22 @@ export default function PharmacyPatient() {
                                     <div className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 flex items-center justify-between">
 
                                       <span className="font-bold text-slate-800">
-                                        {selectedBatch?.quantity ??
-                                          0}
+                                        {selectedBatch
+                                          ? getBatchQuantity(
+                                              selectedBatch
+                                            )
+                                          : 0}
                                       </span>
 
                                       <Package
                                         size={17}
                                         className={
                                           Number(
-                                            selectedBatch?.quantity ||
-                                              0
+                                            selectedBatch
+                                              ? getBatchQuantity(
+                                                  selectedBatch
+                                                )
+                                              : 0
                                           ) > 0
                                             ? "text-emerald-500"
                                             : "text-red-500"
@@ -1666,11 +2065,13 @@ export default function PharmacyPatient() {
                                       />
 
                                     </div>
+
                                   </div>
 
                                   {/* DISPENSE QUANTITY */}
 
                                   <div>
+
                                     <label className="block text-xs font-semibold text-slate-500 mb-2">
                                       Dispense Quantity
                                     </label>
@@ -1704,13 +2105,17 @@ export default function PharmacyPatient() {
 
                                     <p className="text-[11px] text-slate-400 mt-1">
                                       Max:{" "}
-                                      {item.quantity}
+                                      {
+                                        item.quantity
+                                      }
                                     </p>
+
                                   </div>
 
                                   {/* PRICE */}
 
                                   <div>
+
                                     <label className="block text-xs font-semibold text-slate-500 mb-2">
                                       Unit Price
                                     </label>
@@ -1739,6 +2144,7 @@ export default function PharmacyPatient() {
                                       }
                                       className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     />
+
                                   </div>
 
                                 </div>
@@ -1756,10 +2162,9 @@ export default function PharmacyPatient() {
                                     <p
                                       className={`font-semibold mt-1 ${
                                         selectedBatch?.expiryDate &&
-                                        new Date(
-                                          selectedBatch.expiryDate
-                                        ) <
-                                          new Date()
+                                        isBatchExpired(
+                                          selectedBatch
+                                        )
                                           ? "text-red-600"
                                           : "text-slate-800"
                                       }`}
@@ -1774,6 +2179,7 @@ export default function PharmacyPatient() {
                                   <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-100 px-4 py-3 flex items-center justify-between">
 
                                     <div>
+
                                       <p className="text-xs text-emerald-600">
                                         Item Total
                                       </p>
@@ -1787,6 +2193,7 @@ export default function PharmacyPatient() {
                                           }
                                         )}
                                       </p>
+
                                     </div>
 
                                     <ShoppingCart
@@ -1839,11 +2246,14 @@ export default function PharmacyPatient() {
 
                       </div>
 
-                      {/* PRESCRIPTION FOOTER */}
+                      {/* =================================================
+                          PRESCRIPTION FOOTER
+                      ================================================= */}
 
                       <div className="mt-6 pt-5 border-t border-slate-200 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
 
                         <div>
+
                           <p className="text-xs text-slate-400 uppercase tracking-wide font-semibold">
                             Prescription Total
                           </p>
@@ -1857,12 +2267,15 @@ export default function PharmacyPatient() {
                               }
                             )}
                           </p>
+
                         </div>
 
                         {!isCompleted && (
                           <button
                             type="button"
-                            disabled={dispensing}
+                            disabled={
+                              dispensing
+                            }
                             onClick={() =>
                               handleDispense(
                                 prescription
@@ -1870,12 +2283,14 @@ export default function PharmacyPatient() {
                             }
                             className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold shadow-lg shadow-blue-200 transition"
                           >
+
                             {dispensing ? (
                               <>
                                 <Loader2
                                   size={19}
                                   className="animate-spin"
                                 />
+
                                 Inatoa Dawa...
                               </>
                             ) : (
@@ -1883,22 +2298,28 @@ export default function PharmacyPatient() {
                                 <ShoppingCart
                                   size={19}
                                 />
+
                                 Toa Dawa
                               </>
                             )}
+
                           </button>
                         )}
 
                         {isCompleted && (
                           <div className="inline-flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold">
+
                             <CheckCircle2
                               size={20}
                             />
+
                             Dawa Zimetolewa
+
                           </div>
                         )}
 
                       </div>
+
                     </div>
                   </section>
                 );
@@ -1920,13 +2341,16 @@ export default function PharmacyPatient() {
               <div className="flex items-center gap-4">
 
                 <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
+
                   <Package
                     size={27}
                     className="text-blue-300"
                   />
+
                 </div>
 
                 <div>
+
                   <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
                     Dispensing Summary
                   </p>
@@ -1938,6 +2362,7 @@ export default function PharmacyPatient() {
                   <p className="text-sm text-slate-400 mt-1">
                     Prescription zote za visit hii
                   </p>
+
                 </div>
 
               </div>
@@ -1961,6 +2386,7 @@ export default function PharmacyPatient() {
               </div>
 
             </div>
+
           </section>
         )}
 

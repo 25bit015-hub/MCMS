@@ -11,7 +11,7 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import api from "../../services/api";
 
@@ -107,6 +107,10 @@ export default function Payments() {
   const [typeFilter, setTypeFilter] = useState("All");
 
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [lastPaymentId, setLastPaymentId] = useState(null);
+
+  const [searchParams] = useSearchParams();
+  const invoiceIdFromUrl = searchParams.get("invoice");
 
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [amount, setAmount] = useState("");
@@ -178,6 +182,22 @@ export default function Payments() {
     fetchInvoices();
     fetchPayments();
   }, []);
+
+  useEffect(() => {
+    if (!invoiceIdFromUrl || invoices.length === 0) return;
+
+    const invoice = invoices.find(
+      (item) => String(item.id) === String(invoiceIdFromUrl)
+    );
+
+    if (invoice) {
+      setSelectedInvoice(invoice);
+      setAmount("");
+      setReference("");
+      setSuccessMessage("");
+      setError("");
+    }
+  }, [invoiceIdFromUrl, invoices]);
 
   // =====================================================
   // FILTER OUTSTANDING INVOICES
@@ -268,6 +288,7 @@ const filteredPayments = useMemo(() => {
 
   const handleSelectInvoice = (invoice) => {
     setSelectedInvoice(invoice);
+    setLastPaymentId(null);
     setAmount("");
     setReference("");
     setSuccessMessage("");
@@ -330,6 +351,8 @@ const filteredPayments = useMemo(() => {
 
       console.log("Payment created:", response.data);
 
+      setLastPaymentId(response.data.id);
+
       setSuccessMessage(
         `Payment of TZS ${formatCurrency(
           paymentAmount
@@ -380,6 +403,7 @@ const filteredPayments = useMemo(() => {
 
   const closePayment = () => {
     setSelectedInvoice(null);
+    setLastPaymentId(null);
     setAmount("");
     setReference("");
     setSuccessMessage("");
@@ -474,15 +498,27 @@ const filteredPayments = useMemo(() => {
         {/* SUCCESS */}
         {successMessage && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 shadow-sm">
-            <div className="flex items-center gap-2">
-              <CheckCircle2
-                size={20}
-                className="text-emerald-600"
-              />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2
+                  size={20}
+                  className="text-emerald-600"
+                />
 
-              <p className="font-semibold text-emerald-700">
-                {successMessage}
-              </p>
+                <p className="font-semibold text-emerald-700">
+                  {successMessage}
+                </p>
+              </div>
+
+              {lastPaymentId && (
+                <Link
+                  to={`/billing/receipt/${lastPaymentId}`}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                >
+                  <Receipt size={17} />
+                  View Receipt
+                </Link>
+              )}
             </div>
           </div>
         )}

@@ -35,6 +35,7 @@ public class RoleModuleDataInitializer {
                     "LABORATORY",
                     "PHARMACY",
                     "BILLING",
+                    "MATERNITY",
                     "USERS"
                 ),
 
@@ -45,7 +46,8 @@ public class RoleModuleDataInitializer {
 
                 "NURSE", Set.of(
                     "DASHBOARD",
-                    "NURSE"
+                    "NURSE",
+                    "MATERNITY"
                 ),
 
                 "DOCTOR", Set.of(
@@ -99,6 +101,11 @@ public class RoleModuleDataInitializer {
                                 );
 
                         roleModuleRepository.save(roleModule);
+
+                        System.out.println(
+                            "Granted " + moduleName +
+                            " permission to " + roleName
+                        );
                     }
                 });
             });

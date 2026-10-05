@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Search,
@@ -11,37 +11,7 @@ import {
   Banknote,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-
-const patients = [
-  {
-    id: "P-001",
-    name: "Amina Hassan",
-    phone: "0712345678",
-    insurance: "NHIF",
-    memberNumber: "NHIF-458921",
-  },
-  {
-    id: "P-002",
-    name: "Mohamed Ali",
-    phone: "0756789123",
-    insurance: "Jubilee Health",
-    memberNumber: "JUB-782341",
-  },
-  {
-    id: "P-003",
-    name: "Fatma Salum",
-    phone: "0765432109",
-    insurance: "Strategis",
-    memberNumber: "STR-214589",
-  },
-  {
-    id: "P-004",
-    name: "Hassan Omar",
-    phone: "0788123456",
-    insurance: "NHIF",
-    memberNumber: "NHIF-621458",
-  },
-];
+import api from "../../services/api";
 
 const services = [
   { id: 1, name: "Consultation", price: 20000 },
@@ -68,6 +38,9 @@ export default function CreateInvoice() {
 
   const [search, setSearch] = useState("");
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [patients, setPatients] = useState([]);
+  const [loadingPatients, setLoadingPatients] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const [billingType, setBillingType] = useState("Cash");
 
@@ -79,20 +52,47 @@ export default function CreateInvoice() {
 
   const [amountPaid, setAmountPaid] = useState("");
 
-  const [invoiceCreated, setInvoiceCreated] = useState(false);
+  const [invoiceCreated, setInvoiceCreated] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadPatients = async () => {
+      try {
+        setLoadingPatients(true);
+        const response = await api.get("/patients");
+        if (mounted) setPatients(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error("Failed to load patients", error);
+        if (mounted) setErrorMessage("Failed to load patients from the server.");
+      } finally {
+        if (mounted) setLoadingPatients(false);
+      }
+    };
+
+    loadPatients();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const filteredPatients = useMemo(() => {
     if (!search.trim()) return [];
 
     const keyword = search.toLowerCase();
 
-    return patients.filter(
-      (patient) =>
-        patient.name.toLowerCase().includes(keyword) ||
-        patient.id.toLowerCase().includes(keyword) ||
-        patient.phone.includes(keyword) ||
-        patient.memberNumber.toLowerCase().includes(keyword)
-    );
+    return patients.filter((patient) => {
+      const fullName = `${patient.firstName || ""} ${patient.lastName || ""}`.trim();
+      const patientNumber = patient.patientNumber || "";
+      const phone = patient.phone || "";
+
+      return (
+        fullName.toLowerCase().includes(keyword) ||
+        patientNumber.toLowerCase().includes(keyword) ||
+        phone.includes(keyword)
+      );
+    });
   }, [search]);
 
   const subtotal = items.reduce(
@@ -109,11 +109,6 @@ export default function CreateInvoice() {
   const selectPatient = (patient) => {
     setSelectedPatient(patient);
     setSearch("");
-
-    if (patient.insurance) {
-      setInsuranceProvider(patient.insurance);
-      setMemberNumber(patient.memberNumber);
-    }
   };
 
   const addService = () => {
@@ -174,30 +169,58 @@ export default function CreateInvoice() {
     setItems(items.filter((item) => item.id !== id));
   };
 
-  const handleCreateInvoice = () => {
+  const handleCreateInvoice = async () => {
+    setErrorMessage("");
+
     if (!selectedPatient) {
-      alert("Please select a patient.");
+      setErrorMessage("Please select a patient.");
       return;
     }
 
     if (items.length === 0) {
-      alert("Please add at least one service.");
+      setErrorMessage("Please add at least one service.");
       return;
     }
 
     if (billingType === "Insurance") {
       if (!insuranceProvider) {
-        alert("Please select an insurance provider.");
+        setErrorMessage("Please select an insurance provider.");
         return;
       }
 
       if (!memberNumber.trim()) {
-        alert("Please enter member/card number.");
+        setErrorMessage("Please enter member/card number.");
         return;
       }
     }
 
-    setInvoiceCreated(true);
+    try {
+      const notes =
+        billingType === "Insurance"
+          ? `Insurance Provider: ${insuranceProvider}; Member Number: ${memberNumber.trim()}`
+          : null;
+
+      const payload = {
+        patientId: Number(selectedPatient.id),
+        billingType: billingType.toUpperCase(),
+        items: items.map((item) => ({
+          description: item.name,
+          quantity: item.quantity,
+          unitPrice: item.price,
+        })),
+        notes,
+      };
+
+      const response = await api.post("/invoices", payload);
+      setInvoiceCreated(response.data);
+    } catch (error) {
+      console.error("Failed to create invoice", error);
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Failed to create invoice. Please try again.";
+      setErrorMessage(message);
+    }
   };
 
   return (
@@ -233,11 +256,17 @@ export default function CreateInvoice() {
               </p>
 
               <p className="font-semibold text-blue-900">
-                INV-00127
+                {invoiceCreated?.invoiceNumber || "New Invoice"}
               </p>
             </div>
           </div>
         </div>
+
+        {errorMessage && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
+            <p className="text-sm font-medium text-red-800">{errorMessage}</p>
+          </div>
+        )}
 
         {/* Success */}
         {invoiceCreated && (
@@ -254,8 +283,8 @@ export default function CreateInvoice() {
                 </h3>
 
                 <p className="mt-1 text-sm text-emerald-700">
-                  Invoice <strong>INV-00127</strong> has been
-                  created successfully.
+                  Invoice <strong>{invoiceCreated.invoiceNumber}</strong> has been
+                  created successfully and saved to the database.
                 </p>
 
                 <button
@@ -373,6 +402,18 @@ export default function CreateInvoice() {
                   className="w-full rounded-xl border border-slate-300 py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
 
+                {loadingPatients && search.trim() && (
+                  <div className="absolute z-20 mt-2 w-full rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-lg">
+                    Searching patients...
+                  </div>
+                )}
+
+                {!loadingPatients && search.trim() && filteredPatients.length === 0 && (
+                  <div className="absolute z-20 mt-2 w-full rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-lg">
+                    No patient found.
+                  </div>
+                )}
+
                 {filteredPatients.length > 0 && (
                   <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
                     {filteredPatients.map((patient) => (
@@ -383,19 +424,15 @@ export default function CreateInvoice() {
                       >
                         <div>
                           <p className="font-medium text-slate-900">
-                            {patient.name}
+                            {`${patient.firstName || ""} ${patient.lastName || ""}`.trim()}
                           </p>
 
                           <p className="text-xs text-slate-500">
-                            {patient.id} • {patient.phone}
+                            {patient.patientNumber || `ID-${patient.id}`} • {patient.phone || "No phone"}
                           </p>
                         </div>
 
-                        {patient.insurance && (
-                          <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">
-                            {patient.insurance}
-                          </span>
-                        )}
+
                       </button>
                     ))}
                   </div>
@@ -407,12 +444,12 @@ export default function CreateInvoice() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-slate-900">
-                        {selectedPatient.name}
+                        {`${selectedPatient.firstName || ""} ${selectedPatient.lastName || ""}`.trim()}
                       </p>
 
                       <p className="text-sm text-slate-600">
-                        {selectedPatient.id} •{" "}
-                        {selectedPatient.phone}
+                        {selectedPatient.patientNumber || `ID-${selectedPatient.id}`} •{" "}
+                        {selectedPatient.phone || "No phone"}
                       </p>
                     </div>
 
@@ -677,50 +714,14 @@ export default function CreateInvoice() {
                 </div>
 
                 {billingType === "Cash" && (
-                  <>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-slate-700">
-                        Amount Paid
-                      </label>
-
-                      <input
-                        type="number"
-                        min="0"
-                        value={amountPaid}
-                        onChange={(e) =>
-                          setAmountPaid(e.target.value)
-                        }
-                        placeholder="0"
-                        className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                      />
-                    </div>
-
-                    <div className="rounded-xl bg-red-50 p-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-red-700">
-                          Balance
-                        </span>
-
-                        <span className="font-bold text-red-800">
-                          TZS {formatCurrency(balance)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {change > 0 && (
-                      <div className="rounded-xl bg-emerald-50 p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-emerald-700">
-                            Change
-                          </span>
-
-                          <span className="font-bold text-emerald-800">
-                            TZS {formatCurrency(change)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </>
+                  <div className="rounded-xl bg-blue-50 p-4">
+                    <p className="text-xs font-medium text-blue-600">
+                      Payment
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-blue-900">
+                      Invoice will be created first. Payment will be recorded from the Payments module.
+                    </p>
+                  </div>
                 )}
 
                 {billingType === "Insurance" && (
@@ -749,7 +750,7 @@ export default function CreateInvoice() {
 
                 <button
                   onClick={handleCreateInvoice}
-                  disabled={invoiceCreated}
+                  disabled={!!invoiceCreated}
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
                   <Save size={18} />

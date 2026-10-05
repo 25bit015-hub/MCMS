@@ -94,7 +94,8 @@ public class ModulePermissionService {
                     "NURSE",
                     "DOCTOR",
                     "LABORATORY",
-                    "PHARMACY"
+                    "PHARMACY",
+                    "MATERNITY"
             );
         }
 
@@ -113,7 +114,8 @@ public class ModulePermissionService {
                     "NURSE",
                     "DOCTOR",
                     "LABORATORY",
-                    "PHARMACY"
+                    "PHARMACY",
+                    "MATERNITY"
             );
         }
 
@@ -150,6 +152,26 @@ public class ModulePermissionService {
                     roleName,
                     "DOCTOR",
                     "LABORATORY"
+            );
+        }
+
+        // =========================================================
+        // MATERNITY
+        //
+        // All Maternity endpoints use the MATERNITY module.
+        //
+        // Access is still controlled by RoleModuleService:
+        //
+        // ROLE -> MATERNITY -> allowed
+        //
+        // Therefore we do NOT bypass security here.
+        // =========================================================
+
+        if (uri.startsWith("/api/maternity")) {
+
+            return hasModulePermission(
+                    roleName,
+                    "MATERNITY"
             );
         }
 

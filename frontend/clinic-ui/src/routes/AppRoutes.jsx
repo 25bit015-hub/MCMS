@@ -82,6 +82,7 @@ import InvoiceDetails from "../pages/billing/InvoiceDetails";
 import InsuranceProviders from "../pages/billing/InsuranceProviders";
 import InsuranceClaims from "../pages/billing/InsuranceClaims";
 import Payments from "../pages/billing/Payments";
+import Receipt from "../pages/billing/Receipt";
 
 /* =========================
    PUBLIC
@@ -444,6 +445,11 @@ export default function AppRoutes() {
                     path="/billing/payments"
                     element={<Payments />}
                   />
+
+                  <Route
+  path="/billing/receipts/:paymentId"
+  element={<Receipt />}
+/>
 
                 </Routes>
 
