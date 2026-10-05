@@ -66,11 +66,6 @@ import ExpiryManagement from "../pages/pharmacy/ExpiryManagement";
 import DispensingHistory from "../pages/pharmacy/DispensingHistory";
 
 /* =========================
-   AUTH
-========================= */
-import Login from "../pages/auth/Login";
-
-/* =========================
    BILLING
 ========================= */
 import BillingDashboard from "../pages/billing/BillingDashboard";
@@ -85,10 +80,32 @@ import Payments from "../pages/billing/Payments";
 import Receipt from "../pages/billing/Receipt";
 
 /* =========================
+   MATERNITY
+========================= */
+import MaternityDashboard from "../pages/maternity/MaternityDashboard";
+import Pregnancies from "../pages/maternity/Pregnancies";
+import RegisterPregnancy from "../pages/maternity/RegisterPregnancy";
+import PregnancyProfile from "../pages/maternity/PregnancyProfile";
+import EditPregnancy from "../pages/maternity/EditPregnancy";
+import ANCVisits from "../pages/maternity/ANCVisits";
+import RegisterANCVisit from "../pages/maternity/RegisterANCVisit";
+import ANCVisitProfile from "../pages/maternity/ANCVisitProfile";
+import EditANCVisit from "../pages/maternity/EditANCVisit";
+import LabourDashboard from "../pages/maternity/LabourDashboard";
+import LabourRecords from "../pages/maternity/LabourRecords";
+import LabourRecordProfile from "../pages/maternity/LabourRecordProfile";
+import RegisterLabourRecord from "../pages/maternity/RegisterLabourRecord";
+import EditLabourRecord from "../pages/maternity/EditLabourRecord";
+
+/* =========================
+   AUTH
+========================= */
+import Login from "../pages/auth/Login";
+
+/* =========================
    PUBLIC
 ========================= */
 import HospitalHome from "../pages/public/HospitalHome";
-
 
 export default function AppRoutes() {
   return (
@@ -190,153 +207,155 @@ export default function AppRoutes() {
                   />
 
                   {/* =========================
-    RECEPTION
-========================= */}
+                      RECEPTION
+                  ========================== */}
 
-<Route
-  path="/reception"
-  element={
-    <ModuleRoute moduleName="RECEPTION">
-      <ReceptionDashboard />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/reception"
+                    element={
+                      <ModuleRoute moduleName="RECEPTION">
+                        <ReceptionDashboard />
+                      </ModuleRoute>
+                    }
+                  />
 
-<Route
-  path="/reception/patients"
-  element={
-    <ModuleRoute moduleName="RECEPTION">
-      <Patients />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/reception/patients"
+                    element={
+                      <ModuleRoute moduleName="RECEPTION">
+                        <Patients />
+                      </ModuleRoute>
+                    }
+                  />
 
-<Route
-  path="/reception/patients/register"
-  element={
-    <ModuleRoute moduleName="RECEPTION">
-      <RegisterPatient />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/reception/patients/register"
+                    element={
+                      <ModuleRoute moduleName="RECEPTION">
+                        <RegisterPatient />
+                      </ModuleRoute>
+                    }
+                  />
 
-<Route
-  path="/reception/register-patient"
-  element={
-    <ModuleRoute moduleName="RECEPTION">
-      <RegisterPatient />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/reception/register-patient"
+                    element={
+                      <ModuleRoute moduleName="RECEPTION">
+                        <RegisterPatient />
+                      </ModuleRoute>
+                    }
+                  />
 
-<Route
-  path="/reception/patients/:id"
-  element={
-    <ModuleRoute moduleName="RECEPTION">
-      <PatientProfile />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/reception/patients/:id"
+                    element={
+                      <ModuleRoute moduleName="RECEPTION">
+                        <PatientProfile />
+                      </ModuleRoute>
+                    }
+                  />
 
-<Route
-  path="/reception/patients/:id/edit"
-  element={
-    <ModuleRoute moduleName="RECEPTION">
-      <EditPatient />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/reception/patients/:id/edit"
+                    element={
+                      <ModuleRoute moduleName="RECEPTION">
+                        <EditPatient />
+                      </ModuleRoute>
+                    }
+                  />
 
-<Route
-  path="/reception/queue"
-  element={
-    <ModuleRoute moduleName="RECEPTION">
-      <PatientQueue />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/reception/queue"
+                    element={
+                      <ModuleRoute moduleName="RECEPTION">
+                        <PatientQueue />
+                      </ModuleRoute>
+                    }
+                  />
+
                   {/* =========================
                       NURSE
                   ========================== */}
 
-<Route
-  path="/nurse"
-  element={
-    <ModuleRoute moduleName="NURSE">
-      <NurseDashboard />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/nurse"
+                    element={
+                      <ModuleRoute moduleName="NURSE">
+                        <NurseDashboard />
+                      </ModuleRoute>
+                    }
+                  />
 
-<Route
-  path="/nurse/patients/:id/vitals"
-  element={
-    <ModuleRoute moduleName="NURSE">
-      <Vitals />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/nurse/patients/:id/vitals"
+                    element={
+                      <ModuleRoute moduleName="NURSE">
+                        <Vitals />
+                      </ModuleRoute>
+                    }
+                  />
 
-<Route
-  path="/nurse/patients/:id/send-doctor"
-  element={
-    <ModuleRoute moduleName="NURSE">
-      <SendToDoctor />
-    </ModuleRoute>
-  }
-/>
-                  {/* =========================
-    DOCTOR
-========================= */}
-
-<Route
-  path="/doctor"
-  element={
-    <ModuleRoute moduleName="DOCTOR">
-      <DoctorDashboard />
-    </ModuleRoute>
-  }
-/>
-
-<Route
-  path="/doctor/patients/:id/consultation"
-  element={
-    <ModuleRoute moduleName="DOCTOR">
-      <Consultation />
-    </ModuleRoute>
-  }
-/>
-
-<Route
-  path="/doctor/queue"
-  element={
-    <ModuleRoute moduleName="DOCTOR">
-      <DoctorQueue />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/nurse/patients/:id/send-doctor"
+                    element={
+                      <ModuleRoute moduleName="NURSE">
+                        <SendToDoctor />
+                      </ModuleRoute>
+                    }
+                  />
 
                   {/* =========================
-    LABORATORY
-========================= */}
+                      DOCTOR
+                  ========================== */}
 
-<Route
-  path="/laboratory"
-  element={
-    <ModuleRoute moduleName="LABORATORY">
-      <LaboratoryDashboard />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/doctor"
+                    element={
+                      <ModuleRoute moduleName="DOCTOR">
+                        <DoctorDashboard />
+                      </ModuleRoute>
+                    }
+                  />
 
-<Route
-  path="/laboratory/patients/:id"
-  element={
-    <ModuleRoute moduleName="LABORATORY">
-      <LaboratoryPatient />
-    </ModuleRoute>
-  }
-/>
+                  <Route
+                    path="/doctor/patients/:id/consultation"
+                    element={
+                      <ModuleRoute moduleName="DOCTOR">
+                        <Consultation />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/doctor/queue"
+                    element={
+                      <ModuleRoute moduleName="DOCTOR">
+                        <DoctorQueue />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  {/* =========================
+                      LABORATORY
+                  ========================== */}
+
+                  <Route
+                    path="/laboratory"
+                    element={
+                      <ModuleRoute moduleName="LABORATORY">
+                        <LaboratoryDashboard />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/laboratory/patients/:id"
+                    element={
+                      <ModuleRoute moduleName="LABORATORY">
+                        <LaboratoryPatient />
+                      </ModuleRoute>
+                    }
+                  />
 
                   {/* =========================
                       PHARMACY
@@ -447,9 +466,139 @@ export default function AppRoutes() {
                   />
 
                   <Route
-  path="/billing/receipts/:paymentId"
-  element={<Receipt />}
-/>
+                    path="/billing/receipts/:paymentId"
+                    element={<Receipt />}
+                  />
+
+                  {/* =========================
+                      MATERNITY
+                  ========================== */}
+
+                  <Route
+                    path="/maternity"
+                    element={
+                      <ModuleRoute moduleName="MATERNITY">
+                        <MaternityDashboard />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  {/* =========================
+                      LABOUR & DELIVERY
+                  ========================== */}
+
+                  <Route
+                    path="/maternity/labour"
+                    element={
+                      <ModuleRoute moduleName="MATERNITY">
+                        <LabourDashboard />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/maternity/pregnancies"
+                    element={
+                      <ModuleRoute moduleName="MATERNITY">
+                        <Pregnancies />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/maternity/pregnancies/register"
+                    element={
+                      <ModuleRoute moduleName="MATERNITY">
+                        <RegisterPregnancy />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/maternity/pregnancies/:id"
+                    element={
+                      <ModuleRoute moduleName="MATERNITY">
+                        <PregnancyProfile />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/maternity/pregnancies/:id/edit"
+                    element={
+                      <ModuleRoute moduleName="MATERNITY">
+                        <EditPregnancy />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/maternity/pregnancies/:id/anc"
+                    element={
+                      <ModuleRoute moduleName="MATERNITY">
+                        <ANCVisits />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/maternity/pregnancies/:id/anc/register"
+                    element={
+                      <ModuleRoute moduleName="MATERNITY">
+                        <RegisterANCVisit />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/maternity/anc-visits/:id"
+                    element={
+                      <ModuleRoute moduleName="MATERNITY">
+                        <ANCVisitProfile />
+                      </ModuleRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/maternity/anc-visits/:id/edit"
+                    element={
+                      <ModuleRoute moduleName="MATERNITY">
+                        <EditANCVisit />
+                      </ModuleRoute>
+                    }
+                  />
+                  <Route 
+                    path="/maternity/labour-records"
+                    element={
+                       <ModuleRoute moduleName="MATERNITY">
+                         <LabourRecords />
+                       </ModuleRoute>
+                    }
+                  />
+                  <Route 
+                    path="/maternity/labour-records/:id"
+                    element={
+                        <ModuleRoute moduleName="MATERNITY">
+                          <LabourRecordProfile />
+                        </ModuleRoute>
+                   }
+                  />
+                  <Route
+                    path="/maternity/labour-records/register"
+                    element={
+                        <ModuleRoute moduleName="MATERNITY">
+                          <RegisterLabourRecord />
+                        </ModuleRoute>
+                  }
+                  />
+                  <Route
+                    path="/maternity/labour-records/:id/edit"
+                    element={
+                        <ModuleRoute moduleName="MATERNITY">
+                          <EditLabourRecord />
+                        </ModuleRoute>
+            }
+                  />
 
                 </Routes>
 
