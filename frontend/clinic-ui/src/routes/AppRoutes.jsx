@@ -96,6 +96,10 @@ import LabourRecords from "../pages/maternity/LabourRecords";
 import LabourRecordProfile from "../pages/maternity/LabourRecordProfile";
 import RegisterLabourRecord from "../pages/maternity/RegisterLabourRecord";
 import EditLabourRecord from "../pages/maternity/EditLabourRecord";
+import NewbornRecords from "../pages/maternity/NewbornRecords";
+import RegisterNewborn from "../pages/maternity/RegisterNewborn";
+import NewbornProfile from "../pages/maternity/NewbornProfile";
+import EditNewborn from "../pages/maternity/EditNewborn";
 
 /* =========================
    AUTH
@@ -599,6 +603,38 @@ export default function AppRoutes() {
                         </ModuleRoute>
             }
                   />
+                  <Route
+                    path="/maternity/newborn-records"
+                    element={
+                         <ModuleRoute moduleName="MATERNITY">
+                             <NewbornRecords />
+                         </ModuleRoute>
+                    }
+                   />
+                   <Route
+                     path="/maternity/newborn-records/register"
+                     element={
+                         <ModuleRoute moduleName="MATERNITY">
+                             <RegisterNewborn />
+                           </ModuleRoute>
+                      }
+                       />
+                       <Route
+  path="/maternity/newborn-records/:id"
+  element={
+    <ModuleRoute moduleName="MATERNITY">
+      <NewbornProfile />
+    </ModuleRoute>
+  }
+/>
+<Route
+  path="/maternity/newborn-records/:id/edit"
+  element={
+    <ModuleRoute moduleName="MATERNITY">
+      <EditNewborn />
+    </ModuleRoute>
+  }
+/>
 
                 </Routes>
 
